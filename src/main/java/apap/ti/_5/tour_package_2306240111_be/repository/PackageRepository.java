@@ -12,4 +12,5 @@ import java.util.Optional;
 public interface PackageRepository extends JpaRepository<Package, String> {
     Page<Package> findAll(Pageable pageable);
     Optional<Package> findById(String id);
+    long countByUserId(String userId);
 }
