@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/package")
+@RequestMapping("/api/packages")
 public class PackageRestController {
     
     @Autowired
@@ -160,7 +160,7 @@ public class PackageRestController {
             PackageResponseDTO packageDTO = convertToPackageResponseDTO(newPackage);
             
             BaseResponseDTO<PackageResponseDTO> response = new BaseResponseDTO<>();
-            response.setStatus(HttpStatus.CREATED.value());
+            response.setStatus(HttpStatus.OK.value());
             response.setMessage("Package created successfully");
             response.setTimestamp(new Date());
             response.setData(packageDTO);

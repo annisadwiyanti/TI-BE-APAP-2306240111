@@ -7,15 +7,11 @@ import org.springframework.data.domain.Pageable;
 
 public interface PackageRestService {
     
-    // Fitur 2: Get all packages with pagination
     Page<Package> getAllPackages(Pageable pageable);
     
-    // Fitur 3: Get package detail by id
     Package getPackageById(String id);
     
-    // Fitur 4: Create new package
     Package createPackage(CreatePackageRequestDTO requestDTO);
     
-    // Helper method untuk generate package ID
     String generatePackageId(String userId);
 }

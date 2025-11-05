@@ -29,23 +29,20 @@ public class PackageRestServiceImpl implements PackageRestService {
     
     @Override
     public Package createPackage(CreatePackageRequestDTO requestDTO) {
-        // Validate end date
         if (requestDTO.getEndDate().isBefore(requestDTO.getStartDate()) || 
             requestDTO.getEndDate().isEqual(requestDTO.getStartDate())) {
             throw new RuntimeException("End date must be after start date");
         }
         
-        // Generate package ID
         String packageId = generatePackageId(requestDTO.getUserId());
         
-        // Build package entity
         Package newPackage = Package.builder()
                 .id(packageId)
                 .userId(requestDTO.getUserId())
                 .packageName(requestDTO.getPackageName())
                 .quota(requestDTO.getQuota())
-                .price(0L) // Initial price is 0
-                .status("Pending") // Initial status is Pending
+                .price(0L) 
+                .status("Pending")
                 .startDate(requestDTO.getStartDate())
                 .endDate(requestDTO.getEndDate())
                 .isDeleted(false)
