@@ -140,6 +140,17 @@ public class PackageRestServiceImpl implements PackageRestService {
             }
         }
         
+        // Reduce quota in ordered_quantities for each plan
+        for (Plan plan : plans) {
+            List<OrderedQuantity> orderedQuantities = orderedQuantityRepository.findByPlanId(plan.getId());
+            for (OrderedQuantity oq : orderedQuantities) {
+                // Reduce quota by ordered_quota amount
+                int newQuota = oq.getQuota() - oq.getOrderedQuota();
+                oq.setQuota(newQuota);
+                orderedQuantityRepository.save(oq);
+            }
+        }
+        
         pkg.setStatus("Processed");
         
         return packageRepository.save(pkg);
