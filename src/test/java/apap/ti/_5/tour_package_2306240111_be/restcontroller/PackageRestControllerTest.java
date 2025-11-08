@@ -700,4 +700,28 @@ class PackageRestControllerTest {
         verify(packageRestService, times(1)).getPackageById(packageId);
         verify(planRepository, times(1)).findByPackageId(packageId);
     }
+
+    @Test
+        void testGetPackageDetail_ServerErrorBranch() throws Exception {
+        when(packageRestService.getPackageById(packageId))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(get("/api/packages/{id}", packageId)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
+
+    @Test
+        void testGetEditPackageForm_ServerErrorBranch() throws Exception {
+        when(packageRestService.getPackageById(packageId))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(get("/api/packages/{id}/edit", packageId)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
 }

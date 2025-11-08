@@ -29,8 +29,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
@@ -501,5 +500,74 @@ class OrderedQuantityRestControllerTest {
                 .andExpect(jsonPath("$.message", containsString("error")));  
 
         verify(orderedQuantityRestService, times(1)).deleteOrderedQuantity(orderedQuantityId);
+    }
+    
+    @Test
+    void testCreateOrderedQuantity_ServerErrorBranch() throws Exception {
+        CreateOrderedQuantityRequestDTO request = CreateOrderedQuantityRequestDTO.builder()
+                .planId(planId).activityId(activityId).orderedQuota(10).build();
+
+        when(orderedQuantityRestService.createOrderedQuantity(any(CreateOrderedQuantityRequestDTO.class)))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(post("/api/ordered-activities/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(request)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
+
+    @Test
+    void testGetOrderedQuantityForEdit_ServerErrorBranch() throws Exception {
+        when(orderedQuantityRestService.getOrderedQuantityById(orderedQuantityId))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(get("/api/ordered-activities/{id}/edit", orderedQuantityId)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
+
+    @Test
+    void testUpdateOrderedQuantity_ServerErrorBranch() throws Exception {
+        UpdateOrderedQuantityRequestDTO request = UpdateOrderedQuantityRequestDTO.builder()
+                .orderedQuota(15).build();
+
+        when(orderedQuantityRestService.updateOrderedQuantity(eq(orderedQuantityId), any(UpdateOrderedQuantityRequestDTO.class)))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(put("/api/ordered-activities/{id}/edit", orderedQuantityId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(request)))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
+
+    @Test
+    void testGetEligibleActivities_ServerErrorBranch() throws Exception {
+        when(orderedQuantityRestService.getEligibleActivities(planId))
+                .thenAnswer(inv -> { throw new Exception("DB down"); });
+
+        mockMvc.perform(get("/api/ordered-activities/eligible")
+                .param("planId", planId.toString())
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
+    }
+
+    @Test
+    void testDeleteOrderedQuantity_ServerErrorBranch() throws Exception {
+        doAnswer(inv -> { throw new Exception("DB down"); })
+                .when(orderedQuantityRestService).deleteOrderedQuantity(orderedQuantityId);
+
+        mockMvc.perform(delete("/api/ordered-activities/{id}/delete", orderedQuantityId)
+                .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value(500))
+                .andExpect(jsonPath("$.message", containsString("Error: DB down")));
     }
 }
