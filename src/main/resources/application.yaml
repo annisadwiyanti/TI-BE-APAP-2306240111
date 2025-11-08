@@ -14,7 +14,7 @@ spring:
       serialization:
         write-dates-as-timestamps: false
       deserialization:
-        adjust-dates-to-context-time-zone: false
+        adjust-dates-to-context-time-zone: true
       time-zone: Asia/Jakarta
 
   datasource:

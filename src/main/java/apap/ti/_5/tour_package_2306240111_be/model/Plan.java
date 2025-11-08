@@ -48,6 +48,10 @@ public class Plan {
     @Column(name = "end_location")
     private String endLocation;
 
+    @Column(name = "is_deleted", nullable = false)
+    @Builder.Default
+    private Boolean isDeleted = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "package_id", referencedColumnName = "id", insertable = false, updatable = false)
     private Package packageEntity;

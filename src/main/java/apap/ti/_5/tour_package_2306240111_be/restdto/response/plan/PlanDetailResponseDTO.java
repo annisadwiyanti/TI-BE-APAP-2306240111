@@ -24,10 +24,10 @@ public class PlanDetailResponseDTO {
     private String status;
     private Long totalPrice;
     
-    @JsonFormat(pattern = "dd/MM/yyyy HH:mm", timezone = "Asia/Jakarta")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm", timezone = "Asia/Jakarta")
     private LocalDateTime startDate;
     
-    @JsonFormat(pattern = "dd/MM/yyyy HH:mm", timezone = "Asia/Jakarta")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm", timezone = "Asia/Jakarta")
     private LocalDateTime endDate;
     
     private String startLocation;

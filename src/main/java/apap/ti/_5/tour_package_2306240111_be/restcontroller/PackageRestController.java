@@ -9,7 +9,6 @@ import apap.ti._5.tour_package_2306240111_be.restdto.response.pkg.PackageDetailR
 import apap.ti._5.tour_package_2306240111_be.restdto.response.pkg.PackageResponseDTO;
 import apap.ti._5.tour_package_2306240111_be.restdto.response.plan.PlanResponseDTO;
 import apap.ti._5.tour_package_2306240111_be.restservice.PackageRestService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,17 +26,15 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/packages")
 public class PackageRestController {
     
-    @Autowired
-    private PackageRestService packageRestService;
+    private final PackageRestService packageRestService;
+    private final PlanRepository planRepository;
     
-    @Autowired
-    private PlanRepository planRepository;
+    public PackageRestController(PackageRestService packageRestService, PlanRepository planRepository) {
+        this.packageRestService = packageRestService;
+        this.planRepository = planRepository;
+    }
     
-    /**
-     * Fitur 2: Read All Packages
-     * GET /api/package
-     * Optional query params: page, size
-     */
+    // Fitur 2: Read All Packages
     @GetMapping("")
     public ResponseEntity<BaseResponseDTO<Map<String, Object>>> getAllPackages(
             @RequestParam(defaultValue = "0") int page,
@@ -46,13 +43,11 @@ public class PackageRestController {
         try {
             Pageable pageable = PageRequest.of(page, size);
             Page<Package> packagePage = packageRestService.getAllPackages(pageable);
-            
-            // Convert to DTO
+
             List<PackageResponseDTO> packageDTOs = packagePage.getContent().stream()
                     .map(this::convertToPackageResponseDTO)
                     .collect(Collectors.toList());
             
-            // Prepare response data with pagination info
             Map<String, Object> response = new HashMap<>();
             response.put("packages", packageDTOs);
             response.put("currentPage", packagePage.getNumber());
@@ -78,20 +73,16 @@ public class PackageRestController {
         }
     }
     
-    /**
-     * Fitur 3: Detail Package
-     * GET /api/package/{id}
-     */
+
+    // Fitur 3: Detail Package
     @GetMapping("/{id}")
     public ResponseEntity<BaseResponseDTO<PackageDetailResponseDTO>> getPackageDetail(@PathVariable String id) {
         
         try {
             Package pkg = packageRestService.getPackageById(id);
             
-            // Get all plans for this package
             List<Plan> plans = planRepository.findByPackageId(id);
             
-            // Convert to DTO
             PackageDetailResponseDTO packageDetailDTO = convertToPackageDetailResponseDTO(pkg, plans);
             
             BaseResponseDTO<PackageDetailResponseDTO> response = new BaseResponseDTO<>();
@@ -122,11 +113,7 @@ public class PackageRestController {
         }
     }
     
-    /**
-     * Fitur 4: Create Package (GET form)
-     * GET /api/package/create
-     * Returns empty form structure
-     */
+    // Fitur 4: Create Package (GET form)
     @GetMapping("/create")
     public ResponseEntity<BaseResponseDTO<Map<String, String>>> getCreatePackageForm() {
         
@@ -146,10 +133,7 @@ public class PackageRestController {
         return ResponseEntity.ok(response);
     }
     
-    /**
-     * Fitur 4: Create Package (POST)
-     * POST /api/package/create
-     */
+    // Fitur 4: Create Package (POST)
     @PostMapping("/create")
     public ResponseEntity<BaseResponseDTO<PackageResponseDTO>> createPackage(
             @RequestBody CreatePackageRequestDTO requestDTO) {
@@ -186,8 +170,6 @@ public class PackageRestController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-    
-    // Helper methods to convert entities to DTOs
     
     private PackageResponseDTO convertToPackageResponseDTO(Package pkg) {
         return PackageResponseDTO.builder()
@@ -233,5 +215,154 @@ public class PackageRestController {
                 .startLocation(plan.getStartLocation())
                 .endLocation(plan.getEndLocation())
                 .build();
+    }
+    
+    // Fitur 5: Delete Package (Soft Delete)
+    @DeleteMapping("/{id}/delete")
+    public ResponseEntity<BaseResponseDTO<String>> deletePackage(@PathVariable String id) {
+        
+        try {
+            packageRestService.deletePackage(id);
+            
+            BaseResponseDTO<String> response = new BaseResponseDTO<>();
+            response.setStatus(HttpStatus.OK.value());
+            response.setMessage("Package deleted successfully");
+            response.setTimestamp(new Date());
+            response.setData("Package with id " + id + " has been deleted along with all associated plans");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            BaseResponseDTO<String> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.BAD_REQUEST.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            
+        } catch (Exception e) {
+            BaseResponseDTO<String> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    // Fitur 6: Edit Package (GET form with plans)
+    @GetMapping("/{id}/edit")
+    public ResponseEntity<BaseResponseDTO<PackageDetailResponseDTO>> getEditPackageForm(@PathVariable String id) {
+        
+        try {
+            Package pkg = packageRestService.getPackageById(id);
+            List<Plan> plans = planRepository.findByPackageId(id);
+            
+            // Convert to DTO with plans for edit form
+            PackageDetailResponseDTO packageDTO = convertToPackageDetailResponseDTO(pkg, plans);
+            
+            BaseResponseDTO<PackageDetailResponseDTO> response = new BaseResponseDTO<>();
+            response.setStatus(HttpStatus.OK.value());
+            response.setMessage("Edit package form with prefilled data and plans");
+            response.setTimestamp(new Date());
+            response.setData(packageDTO);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            BaseResponseDTO<PackageDetailResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.NOT_FOUND.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } catch (Exception e) {
+            BaseResponseDTO<PackageDetailResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    // Fitur 6: Edit Package (PUT)
+    @PutMapping("/{id}/edit")
+    public ResponseEntity<BaseResponseDTO<PackageResponseDTO>> updatePackage(
+            @PathVariable String id,
+            @RequestBody apap.ti._5.tour_package_2306240111_be.restdto.request.packagereq.UpdatePackageRequestDTO requestDTO) {
+        
+        try {
+            Package updatedPackage = packageRestService.updatePackage(id, requestDTO);
+            
+            PackageResponseDTO packageDTO = convertToPackageResponseDTO(updatedPackage);
+            
+            BaseResponseDTO<PackageResponseDTO> response = new BaseResponseDTO<>();
+            response.setStatus(HttpStatus.OK.value());
+            response.setMessage("Package updated successfully");
+            response.setTimestamp(new Date());
+            response.setData(packageDTO);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            BaseResponseDTO<PackageResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.BAD_REQUEST.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            
+        } catch (Exception e) {
+            BaseResponseDTO<PackageResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    // Fitur 7: Process Package
+    @PutMapping("/{id}/process")
+    public ResponseEntity<BaseResponseDTO<PackageResponseDTO>> processPackage(@PathVariable String id) {
+        
+        try {
+            Package processedPackage = packageRestService.processPackage(id);
+            
+            PackageResponseDTO packageDTO = convertToPackageResponseDTO(processedPackage);
+            
+            BaseResponseDTO<PackageResponseDTO> response = new BaseResponseDTO<>();
+            response.setStatus(HttpStatus.OK.value());
+            response.setMessage("Package processed successfully");
+            response.setTimestamp(new Date());
+            response.setData(packageDTO);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (RuntimeException e) {
+            BaseResponseDTO<PackageResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.BAD_REQUEST.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            
+        } catch (Exception e) {
+            BaseResponseDTO<PackageResponseDTO> errorResponse = new BaseResponseDTO<>();
+            errorResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            errorResponse.setMessage("Error: " + e.getMessage());
+            errorResponse.setTimestamp(new Date());
+            errorResponse.setData(null);
+            
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 }

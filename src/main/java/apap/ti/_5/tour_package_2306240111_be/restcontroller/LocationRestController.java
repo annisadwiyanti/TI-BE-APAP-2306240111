@@ -4,7 +4,6 @@ import apap.ti._5.tour_package_2306240111_be.restdto.response.BaseResponseDTO;
 import apap.ti._5.tour_package_2306240111_be.restdto.response.location.ProvinceDTO;
 import apap.ti._5.tour_package_2306240111_be.restdto.response.location.RegencyDTO;
 import apap.ti._5.tour_package_2306240111_be.restservice.LocationRestService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,8 +15,11 @@ import java.util.List;
 @RequestMapping("/api/location")
 public class LocationRestController {
     
-    @Autowired
-    private LocationRestService locationRestService;
+    private final LocationRestService locationRestService;
+    
+    public LocationRestController(LocationRestService locationRestService) {
+        this.locationRestService = locationRestService;
+    }
     
     @GetMapping("/provinces")
     public ResponseEntity<BaseResponseDTO<List<ProvinceDTO>>> getAllProvinces() {

@@ -12,10 +12,9 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CreatePlanRequestDTO {
+public class UpdatePlanRequestDTO {
     
     private String planName;
-    private String activityType; 
     
     @JsonFormat(pattern = "dd/MM/yyyy HH:mm", locale = "id_ID")
     private LocalDateTime startDate;
