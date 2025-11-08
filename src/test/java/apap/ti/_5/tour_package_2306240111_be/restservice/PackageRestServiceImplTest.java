@@ -44,444 +44,613 @@ class PackageRestServiceImplTest {
     @InjectMocks
     private PackageRestServiceImpl packageRestService;
 
-    private Package package_;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private CreatePackageRequestDTO createDTO;
-    private UpdatePackageRequestDTO updateDTO;
+    private Package testPackage;
+    private Plan testPlan;
+    private OrderedQuantity testOrderedQuantity;
+    private String packageId;
+    private UUID planId;
 
     @BeforeEach
     void setUp() {
-        startDate = LocalDateTime.of(2025, 11, 8, 10, 0);
-        endDate = LocalDateTime.of(2025, 11, 15, 12, 0);
+        packageId = "PACK-USER001-001";
+        planId = UUID.randomUUID();
 
-        package_ = Package.builder()
-                .id("PACK-USER123-001")
-                .userId("USER123")
-                .packageName("Bali Holiday Package")
+        testPackage = Package.builder()
+                .id(packageId)
+                .userId("USER001")
+                .packageName("Bali Tour Package")
                 .quota(10)
-                .price(50000000L)
+                .price(0L)
                 .status("Pending")
-                .startDate(startDate)
-                .endDate(endDate)
+                .startDate(LocalDateTime.of(2025, 12, 1, 0, 0))
+                .endDate(LocalDateTime.of(2025, 12, 10, 23, 59))
                 .isDeleted(false)
                 .build();
 
-        createDTO = new CreatePackageRequestDTO();
-        createDTO.setUserId("USER123");
-        createDTO.setPackageName("Bali Holiday Package");
-        createDTO.setQuota(10);
-        createDTO.setStartDate(startDate);
-        createDTO.setEndDate(endDate);
+        testPlan = Plan.builder()
+                .id(planId)
+                .packageId(packageId)
+                .planName("Day 1 Flight")
+                .price(1000000L)
+                .activityType("Flight")
+                .status("Fulfilled")
+                .startDate(LocalDateTime.of(2025, 12, 1, 8, 0))
+                .endDate(LocalDateTime.of(2025, 12, 1, 10, 0))
+                .startLocation("Jakarta")
+                .endLocation("Bali")
+                .build();
 
-        updateDTO = new UpdatePackageRequestDTO();
-        updateDTO.setPackageName("Updated Package");
-        updateDTO.setQuota(15);
-        updateDTO.setStartDate(startDate);
-        updateDTO.setEndDate(endDate);
+        testOrderedQuantity = OrderedQuantity.builder()
+                .id(UUID.randomUUID())
+                .planId(planId)
+                .activityId("ACT-001")
+                .orderedQuota(5)
+                .quota(10)
+                .price(200000L)
+                .startDate(LocalDateTime.of(2025, 12, 1, 8, 0))
+                .endDate(LocalDateTime.of(2025, 12, 1, 10, 0))
+                .build();
     }
 
     @Test
-    void testGetAllPackagesSuccess() {
-        List<Package> packages = new ArrayList<>();
-        packages.add(package_);
-        Page<Package> page = new PageImpl<>(packages);
+    void testGetAllPackages_Success() {
+        List<Package> packages = List.of(testPackage);
+        Page<Package> packagePage = new PageImpl<>(packages);
         Pageable pageable = PageRequest.of(0, 10);
 
-        when(packageRepository.findAll(pageable)).thenReturn(page);
+        when(packageRepository.findAll(pageable)).thenReturn(packagePage);
 
         Page<Package> result = packageRestService.getAllPackages(pageable);
 
         assertNotNull(result);
-        assertEquals(1, result.getContent().size());
+        assertEquals(1, result.getTotalElements());
+        assertEquals(packageId, result.getContent().get(0).getId());
         verify(packageRepository, times(1)).findAll(pageable);
     }
 
     @Test
-    void testGetPackageByIdSuccess() {
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
+    void testGetAllPackages_EmptyList() {
+        Page<Package> emptyPage = new PageImpl<>(new ArrayList<>());
+        Pageable pageable = PageRequest.of(0, 10);
 
-        Package result = packageRestService.getPackageById("PACK-USER123-001");
+        when(packageRepository.findAll(pageable)).thenReturn(emptyPage);
+
+        Page<Package> result = packageRestService.getAllPackages(pageable);
 
         assertNotNull(result);
-        assertEquals("Bali Holiday Package", result.getPackageName());
-        verify(packageRepository, times(1)).findById("PACK-USER123-001");
+        assertEquals(0, result.getTotalElements());
+        verify(packageRepository, times(1)).findAll(pageable);
     }
 
     @Test
-    void testGetPackageByIdNotFound() {
-        when(packageRepository.findById("NON-EXISTENT")).thenReturn(Optional.empty());
+    void testGetAllPackages_MultiplePage() {
+        Package pkg2 = Package.builder()
+                .id("PACK-USER001-002")
+                .userId("USER001")
+                .packageName("Jakarta Tour")
+                .quota(15)
+                .price(0L)
+                .status("Pending")
+                .startDate(LocalDateTime.of(2025, 11, 1, 0, 0))
+                .endDate(LocalDateTime.of(2025, 11, 10, 23, 59))
+                .isDeleted(false)
+                .build();
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.getPackageById("NON-EXISTENT");
+        List<Package> packages = List.of(testPackage, pkg2);
+        Page<Package> packagePage = new PageImpl<>(packages);
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(packageRepository.findAll(pageable)).thenReturn(packagePage);
+
+        Page<Package> result = packageRestService.getAllPackages(pageable);
+
+        assertEquals(2, result.getTotalElements());
+    }
+
+    @Test
+    void testGetPackageById_Success() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+
+        Package result = packageRestService.getPackageById(packageId);
+
+        assertNotNull(result);
+        assertEquals(packageId, result.getId());
+        assertEquals("Bali Tour Package", result.getPackageName());
+        verify(packageRepository, times(1)).findById(packageId);
+    }
+
+    @Test
+    void testGetPackageById_NotFound() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.getPackageById(packageId);
         });
-        
-        verify(packageRepository, times(1)).findById("NON-EXISTENT");
+
+        assertTrue(exception.getMessage().contains("Package not found with id"));
+        verify(packageRepository, times(1)).findById(packageId);
     }
 
     @Test
-    void testCreatePackageSuccess() {
-        when(packageRepository.countByUserId("USER123")).thenReturn(0L);
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
+    void testGetPackageById_VerifyAllFields() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
 
-        Package result = packageRestService.createPackage(createDTO);
+        Package result = packageRestService.getPackageById(packageId);
 
-        assertNotNull(result);
-        assertEquals("PACK-USER123-001", result.getId());
+        assertEquals("USER001", result.getUserId());
+        assertEquals(10, result.getQuota());
         assertEquals("Pending", result.getStatus());
-        assertEquals(0L, result.getPrice());
-        verify(packageRepository, times(1)).save(any(Package.class));
+        assertFalse(result.getIsDeleted());
     }
 
     @Test
-    void testCreatePackageInvalidDateRange() {
-        createDTO.setStartDate(LocalDateTime.of(2025, 11, 15, 12, 0));
-        createDTO.setEndDate(LocalDateTime.of(2025, 11, 8, 10, 0));
+    void testCreatePackage_Success() {
+        CreatePackageRequestDTO requestDTO = new CreatePackageRequestDTO();
+        requestDTO.setUserId("USER001");
+        requestDTO.setPackageName("New Package");
+        requestDTO.setQuota(20);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 10, 0, 0));
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.createPackage(createDTO);
+        when(packageRepository.countByUserId("USER001")).thenReturn(2L);
+        when(packageRepository.save(any(Package.class))).thenAnswer(invocation -> {
+            Package pkg = invocation.getArgument(0);
+            assertEquals("PACK-USER001-003", pkg.getId());
+            assertEquals("Pending", pkg.getStatus());
+            assertEquals(0L, pkg.getPrice());
+            assertFalse(pkg.getIsDeleted());
+            return pkg;
         });
-    }
 
-    @Test
-    void testCreatePackageSameDateRange() {
-        createDTO.setStartDate(LocalDateTime.of(2025, 11, 8, 10, 0));
-        createDTO.setEndDate(LocalDateTime.of(2025, 11, 8, 10, 0));
-
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.createPackage(createDTO);
-        });
-    }
-
-    @Test
-    void testGeneratePackageIdFirstPackage() {
-        when(packageRepository.countByUserId("USER123")).thenReturn(0L);
-
-        String result = packageRestService.generatePackageId("USER123");
-
-        assertEquals("PACK-USER123-001", result);
-    }
-
-    @Test
-    void testGeneratePackageIdMultiplePackages() {
-        when(packageRepository.countByUserId("USER123")).thenReturn(5L);
-
-        String result = packageRestService.generatePackageId("USER123");
-
-        assertEquals("PACK-USER123-006", result);
-    }
-
-    @Test
-    void testDeletePackageSuccess() {
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(new ArrayList<>());
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
-
-        packageRestService.deletePackage("PACK-USER123-001");
-
-        assertTrue(package_.getIsDeleted());
-        verify(packageRepository, times(1)).save(any(Package.class));
-    }
-
-    @Test
-    void testDeletePackageNotFound() {
-        when(packageRepository.findById("NON-EXISTENT")).thenReturn(Optional.empty());
-
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.deletePackage("NON-EXISTENT");
-        });
-    }
-
-    @Test
-    void testDeletePackageNotPending() {
-        Package processedPackage = package_.toBuilder().status("Processed").build();
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(processedPackage));
-
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.deletePackage("PACK-USER123-001");
-        });
-    }
-
-    @Test
-    void testDeletePackageWithPlans() {
-        List<Plan> plans = new ArrayList<>();
-        Plan plan = Plan.builder()
-                .id(UUID.randomUUID())
-                .packageId("PACK-USER123-001")
-                .planName("Test Plan")
-                .price(1500000L)
-                .activityType("Flight")
-                .status("Unfulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build();
-        plans.add(plan);
-
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
-        when(orderedQuantityRepository.findByPlanId(plan.getId())).thenReturn(new ArrayList<>());
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
-
-        packageRestService.deletePackage("PACK-USER123-001");
-
-        verify(planRepository, times(1)).delete(plan);
-        verify(packageRepository, times(1)).save(any(Package.class));
-    }
-
-    @Test
-    void testUpdatePackageSuccess() {
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(new ArrayList<>());
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
-
-        Package result = packageRestService.updatePackage("PACK-USER123-001", updateDTO);
+        Package result = packageRestService.createPackage(requestDTO);
 
         assertNotNull(result);
+        verify(packageRepository, times(1)).countByUserId("USER001");
         verify(packageRepository, times(1)).save(any(Package.class));
     }
 
     @Test
-    void testUpdatePackageNotFound() {
-        when(packageRepository.findById("NON-EXISTENT")).thenReturn(Optional.empty());
+    void testCreatePackage_EndDateBeforeStartDate() {
+        CreatePackageRequestDTO requestDTO = new CreatePackageRequestDTO();
+        requestDTO.setUserId("USER001");
+        requestDTO.setPackageName("Invalid Package");
+        requestDTO.setQuota(20);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 10, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 1, 0, 0));
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.updatePackage("NON-EXISTENT", updateDTO);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.createPackage(requestDTO);
         });
+
+        assertTrue(exception.getMessage().contains("End date must be after start date"));
+        verify(packageRepository, never()).save(any(Package.class));
     }
 
     @Test
-    void testUpdatePackageNotPending() {
-        Package processedPackage = package_.toBuilder().status("Processed").build();
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(processedPackage));
+    void testCreatePackage_EndDateEqualsStartDate() {
+        CreatePackageRequestDTO requestDTO = new CreatePackageRequestDTO();
+        requestDTO.setUserId("USER001");
+        requestDTO.setPackageName("Invalid Package");
+        requestDTO.setQuota(20);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 1, 0, 0));
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.updatePackage("PACK-USER123-001", updateDTO);
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.createPackage(requestDTO);
         });
+
+        assertTrue(exception.getMessage().contains("End date must be after start date"));
+        verify(packageRepository, never()).save(any(Package.class));
     }
 
     @Test
-    void testUpdatePackageWithExistingPlans() {
-        List<Plan> plans = new ArrayList<>();
-        plans.add(Plan.builder()
-                .id(UUID.randomUUID())
-                .packageId("PACK-USER123-001")
-                .planName("Test Plan")
-                .price(1500000L)
-                .activityType("Flight")
-                .status("Unfulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build());
+    void testCreatePackage_WithMinimalQuota() {
+        CreatePackageRequestDTO requestDTO = new CreatePackageRequestDTO();
+        requestDTO.setUserId("USER002");
+        requestDTO.setPackageName("Minimal Package");
+        requestDTO.setQuota(1);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 2, 0, 0));
 
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
+        when(packageRepository.countByUserId("USER002")).thenReturn(0L);
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.updatePackage("PACK-USER123-001", updateDTO);
-        });
+        Package result = packageRestService.createPackage(requestDTO);
+
+        assertNotNull(result);
+        assertEquals(1, result.getQuota());
     }
 
     @Test
-    void testUpdatePackageInvalidDateRange() {
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(new ArrayList<>());
+    void testGeneratePackageId_FirstPackage() {
+        when(packageRepository.countByUserId("USER001")).thenReturn(0L);
 
-        updateDTO.setStartDate(LocalDateTime.of(2025, 11, 15, 12, 0));
-        updateDTO.setEndDate(LocalDateTime.of(2025, 11, 8, 10, 0));
+        String result = packageRestService.generatePackageId("USER001");
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.updatePackage("PACK-USER123-001", updateDTO);
-        });
+        assertEquals("PACK-USER001-001", result);
+        verify(packageRepository, times(1)).countByUserId("USER001");
     }
 
     @Test
-    void testProcessPackageSuccess() {
-        UUID planId = UUID.randomUUID();
-        List<Plan> plans = new ArrayList<>();
-        Plan fulfilledPlan = Plan.builder()
-                .id(planId)
-                .packageId("PACK-USER123-001")
-                .planName("Fulfilled Plan")
-                .price(1500000L)
-                .activityType("Flight")
-                .status("Fulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build();
-        plans.add(fulfilledPlan);
+    void testGeneratePackageId_MultiplePackages() {
+        when(packageRepository.countByUserId("USER001")).thenReturn(5L);
 
-        // Create ordered quantities for the plan
-        OrderedQuantity oq1 = OrderedQuantity.builder()
-                .id(UUID.randomUUID())
-                .planId(planId)
-                .activityId("ACT-FL-00001")
-                .orderedQuota(5)
-                .quota(10)
-                .price(1500000L)
-                .startDate(startDate)
-                .endDate(endDate)
-                .build();
+        String result = packageRestService.generatePackageId("USER001");
 
-        List<OrderedQuantity> orderedQuantities = new ArrayList<>();
-        orderedQuantities.add(oq1);
+        assertEquals("PACK-USER001-006", result);
+        verify(packageRepository, times(1)).countByUserId("USER001");
+    }
 
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
+    @Test
+    void testGeneratePackageId_LargeCount() {
+        when(packageRepository.countByUserId("USER001")).thenReturn(99L);
+
+        String result = packageRestService.generatePackageId("USER001");
+
+        assertEquals("PACK-USER001-100", result);
+    }
+
+    @Test
+    void testGeneratePackageId_DifferentUsers() {
+        when(packageRepository.countByUserId("USER999")).thenReturn(0L);
+
+        String result = packageRestService.generatePackageId("USER999");
+
+        assertEquals("PACK-USER999-001", result);
+    }
+
+    @Test
+    void testDeletePackage_Success() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(invocation -> {
+            Package pkg = invocation.getArgument(0);
+            assertTrue(pkg.getIsDeleted());
+            return pkg;
+        });
+
+        packageRestService.deletePackage(packageId);
+
+        verify(packageRepository, times(1)).findById(packageId);
+        verify(planRepository, times(1)).findByPackageId(packageId);
+        verify(packageRepository, times(1)).save(any(Package.class));
+    }
+
+    @Test
+    void testDeletePackage_NotFound() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.deletePackage(packageId);
+        });
+
+        assertTrue(exception.getMessage().contains("Package not found"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testDeletePackage_NotPendingStatus() {
+        testPackage.setStatus("Processed");
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.deletePackage(packageId);
+        });
+
+        assertTrue(exception.getMessage().contains("Package status must be 'Pending'"));
+        verify(packageRepository, times(1)).findById(packageId);
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testDeletePackage_WithPlansAndOrderedQuantities() {
+        List<Plan> plans = List.of(testPlan);
+        List<OrderedQuantity> orderedQuantities = List.of(testOrderedQuantity);
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(plans);
         when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(orderedQuantities);
-        when(orderedQuantityRepository.save(any(OrderedQuantity.class))).thenReturn(oq1);
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
 
-        Package result = packageRestService.processPackage("PACK-USER123-001");
+        packageRestService.deletePackage(packageId);
 
-        assertNotNull(result);
-        assertEquals("Processed", result.getStatus());
-        verify(orderedQuantityRepository, times(1)).findByPlanId(planId);
-        verify(orderedQuantityRepository, times(1)).save(any(OrderedQuantity.class));
+        verify(orderedQuantityRepository, times(1)).deleteAll(orderedQuantities);
+        verify(planRepository, times(1)).delete(testPlan);
         verify(packageRepository, times(1)).save(any(Package.class));
     }
 
     @Test
-    void testProcessPackageReducesQuota() {
-        UUID planId = UUID.randomUUID();
-        List<Plan> plans = new ArrayList<>();
-        Plan fulfilledPlan = Plan.builder()
-                .id(planId)
-                .packageId("PACK-USER123-001")
-                .planName("Fulfilled Plan")
-                .price(1500000L)
-                .activityType("Flight")
-                .status("Fulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build();
-        plans.add(fulfilledPlan);
-
-        // Create ordered quantity with quota 10, ordered_quota 3
-        OrderedQuantity oq = OrderedQuantity.builder()
+    void testDeletePackage_WithMultiplePlans() {
+        Plan plan2 = Plan.builder()
                 .id(UUID.randomUUID())
-                .planId(planId)
-                .activityId("ACT-FL-00001")
-                .orderedQuota(3)
-                .quota(10)
-                .price(1500000L)
-                .startDate(startDate)
-                .endDate(endDate)
+                .packageId(packageId)
+                .planName("Day 2 Hotel")
+                .status("Fulfilled")
                 .build();
 
-        List<OrderedQuantity> orderedQuantities = new ArrayList<>();
-        orderedQuantities.add(oq);
+        List<Plan> plans = List.of(testPlan, plan2);
 
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(plans);
+        when(orderedQuantityRepository.findByPlanId(any())).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
+
+        packageRestService.deletePackage(packageId);
+
+        verify(planRepository, times(2)).delete(any(Plan.class));
+    }
+
+    @Test
+    void testUpdatePackage_Success() {
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(invocation -> {
+            Package pkg = invocation.getArgument(0);
+            assertEquals("Updated Package", pkg.getPackageName());
+            assertEquals(30, pkg.getQuota());
+            return pkg;
+        });
+
+        Package result = packageRestService.updatePackage(packageId, requestDTO);
+
+        assertNotNull(result);
+        verify(packageRepository, times(1)).findById(packageId);
+        verify(planRepository, times(1)).findByPackageId(packageId);
+        verify(packageRepository, times(1)).save(any(Package.class));
+    }
+
+    @Test
+    void testUpdatePackage_NotFound() {
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.updatePackage(packageId, requestDTO);
+        });
+
+        assertTrue(exception.getMessage().contains("Package not found"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testUpdatePackage_NotPendingStatus() {
+        testPackage.setStatus("Processed");
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.updatePackage(packageId, requestDTO);
+        });
+
+        assertTrue(exception.getMessage().contains("Package status must be 'Pending'"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testUpdatePackage_WithExistingPlans() {
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(List.of(testPlan));
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.updatePackage(packageId, requestDTO);
+        });
+
+        assertTrue(exception.getMessage().contains("Package has associated plans"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testUpdatePackage_InvalidDates() {
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(new ArrayList<>());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.updatePackage(packageId, requestDTO);
+        });
+
+        assertTrue(exception.getMessage().contains("End date must be after start date"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testUpdatePackage_UserIdNotChanged() {
+        UpdatePackageRequestDTO requestDTO = new UpdatePackageRequestDTO();
+        requestDTO.setPackageName("Updated Package");
+        requestDTO.setQuota(30);
+        requestDTO.setStartDate(LocalDateTime.of(2025, 12, 1, 0, 0));
+        requestDTO.setEndDate(LocalDateTime.of(2025, 12, 15, 0, 0));
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(invocation -> {
+            Package pkg = invocation.getArgument(0);
+            assertEquals("USER001", pkg.getUserId());
+            return pkg;
+        });
+
+        packageRestService.updatePackage(packageId, requestDTO);
+
+        verify(packageRepository).save(any(Package.class));
+    }
+
+    @Test
+    void testProcessPackage_Success() {
+        testPlan.setStatus("Fulfilled");
+        List<Plan> plans = List.of(testPlan);
+        List<OrderedQuantity> orderedQuantities = List.of(testOrderedQuantity);
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(plans);
         when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(orderedQuantities);
         when(orderedQuantityRepository.save(any(OrderedQuantity.class))).thenAnswer(invocation -> {
-            OrderedQuantity savedOq = invocation.getArgument(0);
-            // Verify quota was reduced correctly: 10 - 3 = 7
-            assertEquals(7, savedOq.getQuota());
-            return savedOq;
+            OrderedQuantity oq = invocation.getArgument(0);
+            assertEquals(5, oq.getQuota()); // 10 - 5 = 5
+            return oq;
         });
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
+        when(packageRepository.save(any(Package.class))).thenAnswer(invocation -> {
+            Package pkg = invocation.getArgument(0);
+            assertEquals("Processed", pkg.getStatus());
+            return pkg;
+        });
 
-        Package result = packageRestService.processPackage("PACK-USER123-001");
+        Package result = packageRestService.processPackage(packageId);
 
         assertNotNull(result);
-        assertEquals("Processed", result.getStatus());
-        verify(orderedQuantityRepository, times(1)).save(any(OrderedQuantity.class));
+        verify(packageRepository, times(1)).findById(packageId);
+        verify(planRepository, times(1)).findByPackageId(packageId);
+        verify(orderedQuantityRepository, times(1)).findByPlanId(planId);
+        verify(packageRepository, times(1)).save(any(Package.class));
     }
 
     @Test
-    void testProcessPackageMultipleOrderedQuantities() {
-        UUID planId = UUID.randomUUID();
-        List<Plan> plans = new ArrayList<>();
-        Plan fulfilledPlan = Plan.builder()
-                .id(planId)
-                .packageId("PACK-USER123-001")
-                .planName("Fulfilled Plan")
-                .price(1500000L)
-                .activityType("Flight")
+    void testProcessPackage_PlanNotFulfilled() {
+        testPlan.setStatus("Unfulfilled");
+        List<Plan> plans = List.of(testPlan);
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(plans);
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.processPackage(packageId);
+        });
+
+        assertTrue(exception.getMessage().contains("All plans must have status 'Fulfilled'"));
+        verify(packageRepository, never()).save(any(Package.class));
+    }
+
+    @Test
+    void testProcessPackage_PackageNotFound() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.empty());
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            packageRestService.processPackage(packageId);
+        });
+
+        assertTrue(exception.getMessage().contains("Package not found"));
+        verify(planRepository, never()).findByPackageId(anyString());
+    }
+
+    @Test
+    void testProcessPackage_MultiplePlansAllFulfilled() {
+        UUID plan2Id = UUID.randomUUID();
+        Plan plan2 = Plan.builder()
+                .id(plan2Id)
+                .packageId(packageId)
                 .status("Fulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build();
-        plans.add(fulfilledPlan);
-
-        // Create multiple ordered quantities
-        OrderedQuantity oq1 = OrderedQuantity.builder()
-                .id(UUID.randomUUID())
-                .planId(planId)
-                .activityId("ACT-FL-00001")
-                .orderedQuota(5)
-                .quota(15)
-                .price(1500000L)
-                .startDate(startDate)
-                .endDate(endDate)
                 .build();
 
+        List<Plan> plans = List.of(testPlan, plan2);
+
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(plans);
+        when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(new ArrayList<>());
+        when(orderedQuantityRepository.findByPlanId(plan2Id)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
+
+        Package result = packageRestService.processPackage(packageId);
+
+        assertNotNull(result);
+        verify(orderedQuantityRepository, times(1)).findByPlanId(planId);
+        verify(orderedQuantityRepository, times(1)).findByPlanId(plan2Id);
+    }
+
+    @Test
+    void testProcessPackage_MultipleOrderedQuantities() {
         OrderedQuantity oq2 = OrderedQuantity.builder()
                 .id(UUID.randomUUID())
                 .planId(planId)
-                .activityId("ACT-ACC-00001")
-                .orderedQuota(2)
+                .activityId("ACT-002")
+                .orderedQuota(3)
                 .quota(8)
-                .price(2000000L)
-                .startDate(startDate)
-                .endDate(endDate)
                 .build();
 
-        List<OrderedQuantity> orderedQuantities = new ArrayList<>();
-        orderedQuantities.add(oq1);
-        orderedQuantities.add(oq2);
+        List<OrderedQuantity> orderedQuantities = List.of(testOrderedQuantity, oq2);
 
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(List.of(testPlan));
         when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(orderedQuantities);
-        when(orderedQuantityRepository.save(any(OrderedQuantity.class))).thenReturn(oq1);
-        when(packageRepository.save(any(Package.class))).thenReturn(package_);
+        when(orderedQuantityRepository.save(any(OrderedQuantity.class))).thenAnswer(i -> i.getArgument(0));
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
 
-        Package result = packageRestService.processPackage("PACK-USER123-001");
+        packageRestService.processPackage(packageId);
+
+        verify(orderedQuantityRepository, times(2)).save(any(OrderedQuantity.class));
+    }
+
+    @Test
+    void testProcessPackage_QuotaReductionCalculation() {
+        testOrderedQuantity.setQuota(20);
+        testOrderedQuantity.setOrderedQuota(7);
+        
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(List.of(testPlan));
+        when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(List.of(testOrderedQuantity));
+        when(orderedQuantityRepository.save(any(OrderedQuantity.class))).thenAnswer(invocation -> {
+            OrderedQuantity oq = invocation.getArgument(0);
+            assertEquals(13, oq.getQuota()); // 20 - 7 = 13
+            return oq;
+        });
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
+
+        packageRestService.processPackage(packageId);
+
+        verify(orderedQuantityRepository).save(any(OrderedQuantity.class));
+    }
+
+    @Test
+    void testProcessPackage_EmptyPlans() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> {
+            Package pkg = i.getArgument(0);
+            assertEquals("Processed", pkg.getStatus());
+            return pkg;
+        });
+
+        Package result = packageRestService.processPackage(packageId);
 
         assertNotNull(result);
         assertEquals("Processed", result.getStatus());
-        // Verify save was called for each ordered quantity
-        verify(orderedQuantityRepository, times(2)).save(any(OrderedQuantity.class));
-        verify(packageRepository, times(1)).save(any(Package.class));
     }
 
     @Test
-    void testProcessPackageNotFound() {
-        when(packageRepository.findById("NON-EXISTENT")).thenReturn(Optional.empty());
+    void testProcessPackage_NoOrderedQuantities() {
+        when(packageRepository.findById(packageId)).thenReturn(Optional.of(testPackage));
+        when(planRepository.findByPackageId(packageId)).thenReturn(List.of(testPlan));
+        when(orderedQuantityRepository.findByPlanId(planId)).thenReturn(new ArrayList<>());
+        when(packageRepository.save(any(Package.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.processPackage("NON-EXISTENT");
-        });
-    }
+        Package result = packageRestService.processPackage(packageId);
 
-    @Test
-    void testProcessPackageUnfulfilledPlans() {
-        List<Plan> plans = new ArrayList<>();
-        Plan unfulfilledPlan = Plan.builder()
-                .id(UUID.randomUUID())
-                .packageId("PACK-USER123-001")
-                .planName("Unfulfilled Plan")
-                .price(1500000L)
-                .activityType("Flight")
-                .status("Unfulfilled")
-                .startDate(startDate)
-                .endDate(endDate)
-                .isDeleted(false)
-                .build();
-        plans.add(unfulfilledPlan);
-
-        when(packageRepository.findById("PACK-USER123-001")).thenReturn(Optional.of(package_));
-        when(planRepository.findByPackageId("PACK-USER123-001")).thenReturn(plans);
-
-        assertThrows(RuntimeException.class, () -> {
-            packageRestService.processPackage("PACK-USER123-001");
-        });
+        assertNotNull(result);
+        verify(orderedQuantityRepository, never()).save(any());
     }
 }
