@@ -104,13 +104,13 @@ jobs:
 
       - name: Upload k8s files to EC2
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ~/app/tourpackage/k8s"
-          scp deployment.yaml configmap.yaml secret.yaml k8s/service.yaml k8s/ingress.yml \
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p ~/app/tour-package-be/k8s"
+          scp deployment.yaml configmap.yaml secret.yaml k8s/service.yaml k8s/ingress.yaml \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/app/tourpackage/k8s/
 
       - name: Apply K8s config
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "
-            sudo k3s kubectl apply -f ~/app/tourpackage/k8s/ &&
+            sudo k3s kubectl apply -f ~/app/tour-package-be/k8s/ &&
             sudo k3s kubectl rollout status deployment/tourpackage -n default
           "
